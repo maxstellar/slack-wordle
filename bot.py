@@ -1,4 +1,12 @@
-# placeholder code with input
+import os
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
+
 
 # load in valid guesses
 with open('valid-wordle-words.txt', 'r') as file:
@@ -40,9 +48,24 @@ def check_guess(guess):
     
     return "".join(check_string)
 
-while 1:
-    user_guess = input()
-    if user_guess == "get me out of here":
-        break
-    print(f"{user_guess.lower()}: {check_guess(user_guess.lower())}")
+@app.command("/guess")
+def handle_guess(ack, respond, command):
+    ack()
+    raw_guess = command.get("text", "")
 
+    if not raw_guess:
+        respond("hey bud... you forgot your guess. try `/wordle <guess here>`")
+        return
+    
+    # process raw guess
+    user_guess = raw_guess.strip().lower()
+
+    if len(user_guess) != 5:
+        respond("hey bud... that's not 5 letters")
+        return
+
+    respond(f"{user_guess}: {check_guess(user_guess)}")
+    return
+
+if __name__ == "__main__":
+    SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN")).start()

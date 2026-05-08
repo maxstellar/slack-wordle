@@ -1,1 +1,10 @@
+# Security
 .env
+
+# Python Cache (Those annoying hidden folders)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Docker Local Volume Data
+postgres_data/

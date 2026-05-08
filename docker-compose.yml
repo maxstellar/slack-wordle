@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: wordledb
+    volumes:
+      # This ensures your game data isn't deleted if the container restarts
+      - postgres_data:/var/lib/postgresql/data
+
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

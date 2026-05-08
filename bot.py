@@ -4,6 +4,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from dotenv import load_dotenv
 from datetime import date
 import requests
+from db import Session, PlayerSession
 
 load_dotenv()
 
@@ -14,21 +15,16 @@ app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 with open('valid-wordle-words.txt', 'r') as file:
     valid_guesses = {line.strip() for line in file}
 
-# init daily word
-today = date.today()
 
 def fetch_word():
     global today
-    response = requests.get(f"https://www.nytimes.com/svc/wordle/v2/{today}.json")
+    response = requests.get(f"https://www.nytimes.com/svc/wordle/v2/{date.today()}.json")
     return response.json()["solution"]
 
 
-daily_word = fetch_word()
-print(daily_word)
-
-
 def check_guess(guess):
-    global daily_word
+
+    daily_word = fetch_word()
 
     if guess not in valid_guesses:
         return "Not in word list"
@@ -75,7 +71,48 @@ def handle_guess(ack, respond, command):
         respond("hey bud... that's not 5 letters")
         return
 
-    respond(f"{user_guess}: {check_guess(user_guess)}")
+    # get guess string!
+
+    guess_string = check_guess(user_guess)
+
+    if guess_string == "Not in word list":
+        respond("that word isn't in our word list... try again bud")
+        return
+
+    # let's talk to the db now
+    db = Session()
+
+    player = db.query(PlayerSession).filter_by(slack_user_id=command['user_id']).first()
+    if not player:
+        player = PlayerSession(slack_user_id=command['user_id'])
+        db.add(player)
+    elif player.play_date != date.today():
+        player.play_date = date.today()
+        player.guesses = ""
+        player.guess_strings = ""
+
+    if not player.guesses:
+        player.guesses = user_guess
+        player.guess_strings = guess_string
+    else:
+        player.guesses += f",{user_guess}"
+        player.guess_strings += f",{guess_string}"
+
+    db.commit()
+
+    # get guess history now that it's updated
+
+    guess_list = player.guesses.split(",")
+    string_list = player.guess_strings.split(",")
+
+
+    reply = f"*guess {len(guess_list)}/6:*\n\n"
+
+    for count, guess in enumerate(guess_list):
+        reply += f"{guess.upper()}: {string_list[count]}\n"
+
+    db.close()
+    respond(reply)
     return
 
 @app.command("/wordle-share")

@@ -23,7 +23,6 @@ def fetch_word():
 
 
 def check_guess(guess):
-
     daily_word = fetch_word()
 
     if guess not in valid_guesses:

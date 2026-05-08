@@ -20,6 +20,8 @@ class PlayerSession(Base):
     yellows = Column(String, default="")
     greens = Column(String, default="")
     grays = Column(String, default="")
+    reminder = Column(Boolean, default=False)
+    streak = Column(Integer, default=0, nullable=False)
 Base.metadata.create_all(engine)
 
 Session = sessionmaker(bind=engine)

@@ -2,15 +2,16 @@ import os
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from dotenv import load_dotenv
-from datetime import date
+from datetime import date, timedelta
 import requests
 from db import Session, PlayerSession
 import string
+from apscheduler.schedulers.background import BackgroundScheduler
+from slack_sdk import WebClient
 
 load_dotenv()
 
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
-
 
 # load in valid guesses
 with open('valid-wordle-words.txt', 'r') as file:
@@ -40,7 +41,7 @@ def check_guess(guess):
             continue
         check_string.append("⬜")
     
-    #fill yellows
+    # fill yellows
     for i, letter in enumerate(guess):
         if check_string[i] == "🟩":
             continue
@@ -54,6 +55,7 @@ def check_guess(guess):
             check_string[i] = "🟨"
     
     return "".join(check_string)
+
 
 @app.command("/wordle")
 def handle_guess(ack, respond, command):
@@ -142,6 +144,18 @@ def handle_guess(ack, respond, command):
         reply_pub += f"{string_list[count]}\n"
 
     if len(guess_list) == 6 or guess_string == "🟩🟩🟩🟩🟩":
+        # handle streaks
+        if guess_string == "🟩🟩🟩🟩🟩" and not player.done:
+            player.streak += 1
+            reply += f"\n*you win! you now have a streak of {player.streak} 🔥*"
+        else:
+            if not player.done:
+                if player.streak != 0:
+                    player.streak = 0
+                    reply += f"\n*the word was `{fetch_word.upper()}`... your streak was lost*"
+                else:
+                    reply += f"\n*the word was `{fetch_word.upper()}`*"
+
         player.done = True
         db.commit()
 
@@ -177,6 +191,7 @@ def handle_guess(ack, respond, command):
 
     db.close()
     return
+
 
 @app.action("share_result_button")
 def handle_share_button(ack, body, client, respond):
@@ -294,5 +309,72 @@ def handle_letters(ack, respond, command):
     return
 
 
+@app.command("/wordle-streak")
+def handle_streak(ack, respond, command):
+    ack()
+    db = Session()
+    player = db.query(PlayerSession).filter_by(slack_user_id=command['user_id']).first()
+
+    if not player.streak or player.streak == 0:
+        respond("you don't currently have a streak! start playing with `/wordle <guess>` to start your streak!")
+        db.close()
+        return
+    
+    respond(f"you currently have a streak of {player.streak}! keep it up 🔥")
+    db.close()
+    return
+
+    
+
+
+def send_reminders():
+    db = Session()
+    slack_client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
+    
+    players = db.query(PlayerSession).all()
+    
+    for player in players:
+        # check if they haven't played today, or started but aren't finished
+        if player.play_date != date.today() or not player.done:
+            try:
+                slack_client.chat_postMessage(
+                    channel=player.slack_user_id, 
+                    text="hey bud, don't forget to play today's wordle. use `/wordle <guess>` to start."
+                )
+            except Exception as e:
+                print(f"failed to send reminder to {player.slack_user_id}: {e}")
+    
+    db.close()
+
+
+def handle_broken_streaks():
+    db = Session()
+    yesterday = date.today() - timedelta(days=1)
+    slack_client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
+
+    # get all players with a streak
+    players = db.query(PlayerSession).filter(PlayerSession.streak > 0).all()
+
+    for player in players:
+        if player.play_date != yesterday and player.play_date != date.today():
+            try:
+                slack_client.chat_postMessage(
+                    channel=player.slack_user_id, 
+                    text=f"your streak of {player.streak} was lost! :pensivecowboy:"
+                )
+            except Exception as e:
+                print(f"failed to send reminder to {player.slack_user_id}: {e}")
+            player.streak = 0
+
+
+    db.commit()
+    db.close()
+
+
 if __name__ == "__main__":
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(send_reminders, 'cron', hour=16, minute=0)
+    scheduler.add_job(handle_broken_streaks, 'cron', hour=0, minute=0)
+    scheduler.start()
+
     SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN")).start()

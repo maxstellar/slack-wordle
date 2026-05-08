@@ -12,7 +12,7 @@ wordle bot for slack, written in python
 
 1. create a slack app at https://api.slack.com/apps
 2. enable socket mode and interactivity
-3. add these slash commands: `/wordle`, `/wordle-share`, and `/wordle-letters`
+3. add these slash commands: `/wordle`, `/wordle-share`, `/wordle-letters`, `/wordle-streak`, and `/wordle-reminder`
 4. under oauth & permissions, add the `chat:write` and `commands` scopes
 5. install the app to your workspace
 6. create a `.env` file from the `.env.example` template
@@ -24,6 +24,8 @@ wordle bot for slack, written in python
 - `/wordle <guess>`: submit a 5-letter guess
 - `/wordle-letters`: see your current keyboard (green, yellow, gray, and remaining)
 - `/wordle-share`: manually share your results to the channel
+- `/wordle-streak`: check your wordle streak
+- `/wordle-reminder`: toggle daily reminders to do the wordle
 
 ## commands
 

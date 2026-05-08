@@ -115,7 +115,7 @@ def handle_guess(ack, respond, command):
 
     for count, guess in enumerate(guess_list):
         reply += f"{guess.upper()}: {string_list[count]}\n"
-        reply_pub += string_list[count]
+        reply_pub += f"{string_list[count]}\n"
 
     if len(guess_list) == 6 or guess_string == "🟩🟩🟩🟩🟩":
         player.done = True
@@ -194,11 +194,11 @@ def handle_share_button(ack, body, client, respond):
 
 
 @app.command("/wordle-share")
-def handle_share(ack, respond, command, client):
+def handle_share(ack, respond, command, body, client):
     ack()
 
-    user_id = command["user"]["id"]
-    channel_id = command["channel"]["id"]
+    user_id = command['user_id']
+    channel_id = command['channel_id']
 
     db = Session()
 

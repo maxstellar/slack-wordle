@@ -17,7 +17,9 @@ class PlayerSession(Base):
     guesses = Column(String, default="")
     guess_strings = Column(String, default="")
     done = Column(Boolean, default=False)
-
+    yellows = Column(String, default="")
+    greens = Column(String, default="")
+    grays = Column(String, default="")
 Base.metadata.create_all(engine)
 
 Session = sessionmaker(bind=engine)

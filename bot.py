@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from datetime import date
 import requests
 from db import Session, PlayerSession
+import string
 
 load_dotenv()
 
@@ -84,11 +85,35 @@ def handle_guess(ack, respond, command):
     if not player:
         player = PlayerSession(slack_user_id=command['user_id'])
         db.add(player)
+        player.greens = ""
+        player.grays = ""
+        player.yellows = ""
     elif player.play_date != date.today():
         player.play_date = date.today()
         player.guesses = ""
         player.guess_strings = ""
         player.done = False
+        player.greens = ""
+        player.yellows = ""
+        player.grays = ""
+
+    # process greens, yellows, grays
+    for i in range(len(guess_string)):
+        if guess_string[i] == "🟩":
+            player.greens += user_guess[i].upper()
+        elif guess_string[i] == "🟨":
+            player.yellows += user_guess[i].upper()
+        elif guess_string[i] == "⬜":
+            player.grays += user_guess[i].upper()
+
+    # cleanup letters
+    green_set = set(player.greens)
+    yellow_set = set(player.yellows)
+    gray_set = set(player.grays)
+    yellow_set = yellow_set - green_set
+    player.greens = "".join(green_set)
+    player.yellows = "".join(yellow_set)
+    player.grays = "".join(gray_set)
 
     if not player.done:
         if not player.guesses:
@@ -193,7 +218,7 @@ def handle_share_button(ack, body, client, respond):
 
 
 @app.command("/wordle-share")
-def handle_share(ack, respond, command, body, client):
+def handle_share(ack, respond, command, client):
     ack()
 
     user_id = command['user_id']
@@ -234,6 +259,40 @@ def handle_share(ack, respond, command, body, client):
 
     respond("your result was shared to the channel!!!")
     return
+
+
+@app.command("/wordle-letters")
+def handle_letters(ack, respond, command):
+    ack()
+    db = Session()
+    player = db.query(PlayerSession).filter_by(slack_user_id=command['user_id']).first()
+
+    if not player or player.play_date != date.today():
+        db.close()
+        respond("you haven't started today's wordle yet! start with `/wordle <guess>`")
+        return
+    if player.done:
+        db.close()
+        respond("you already finished... you don't need this tool!")
+        return
+
+    green_set = set(player.greens or "")
+    yellow_set = set(player.yellows or "")
+    gray_set = set(player.grays or "")
+
+    alphabet = set(string.ascii_uppercase)
+    used = green_set | yellow_set | gray_set
+    missing = alphabet - used
+
+    reply =  f"🟩 {', '.join(sorted(green_set)) or 'None'}\n"
+    reply += f"🟨 {', '.join(sorted(yellow_set)) or 'None'}\n"
+    reply += f"⬜ {', '.join(sorted(gray_set)) or 'None'}\n"
+    reply += f"❔ {', '.join(sorted(missing)) or 'None'}"
+
+    db.close()
+    respond(reply)
+    return
+
 
 if __name__ == "__main__":
     SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN")).start()

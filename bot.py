@@ -194,9 +194,46 @@ def handle_share_button(ack, body, client, respond):
 
 
 @app.command("/wordle-share")
-def handle_share(ack, respond, command):
+def handle_share(ack, respond, command, client):
     ack()
-    respond("i'm tired boss. no more sharing for you")
+
+    user_id = command["user"]["id"]
+    channel_id = command["channel"]["id"]
+
+    db = Session()
+
+    player = db.query(PlayerSession).filter_by(slack_user_id=command['user_id']).first()
+
+    if not player:
+        respond("you haven't played wordle yet! finish today's wordle, and then you can share your results :thinking:")
+        return
+    if not player.done:
+        respond("you haven't finished today's wordle yet! finish today's wordle, and then you can share your results :thinking:")
+        return
+
+    guess_list = player.guesses.split(",")
+    string_list = player.guess_strings.split(",")
+
+    guess_amt = "X" if "🟩🟩🟩🟩🟩" not in string_list else len(guess_list)
+    wordle_number = int(requests.get(f"https://www.nytimes.com/svc/wordle/v2/{date.today()}.json").json()["days_since_launch"])
+
+    public_guess_strings = ""
+    for i in string_list:
+        public_guess_strings += f"{i}\n"
+
+    try:
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"<@{user_id}> - Wordle {wordle_number:,} {guess_amt}/6\n\n{public_guess_strings}"
+        )
+    except Exception as e:
+        if "channel_not_found" in str(e):
+            respond("hey i'm not in this channel bud. invite me to the channel by using `/invite @Wordle for Slack` and then try again.")
+            return
+        else:
+            raise
+
+    respond("your result was shared to the channel!!!")
     return
 
 if __name__ == "__main__":

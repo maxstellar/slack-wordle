@@ -315,7 +315,7 @@ def handle_streak(ack, respond, command):
     db = Session()
     player = db.query(PlayerSession).filter_by(slack_user_id=command['user_id']).first()
 
-    if not player.streak or player.streak == 0:
+    if not player or not player.streak or player.streak == 0:
         respond("you don't currently have a streak! start playing with `/wordle <guess>` to start your streak!")
         db.close()
         return
@@ -324,8 +324,28 @@ def handle_streak(ack, respond, command):
     db.close()
     return
 
-    
 
+@app.command("/wordle-reminder")
+def handle_reminder(ack, respond, command):
+    ack()
+    db = Session()
+    player = db.query(PlayerSession).filter_by(slack_user_id=command['user_id']).first()
+
+    if not player:
+        player = PlayerSession(slack_user_id=command['user_id'])
+        db.add(player)
+        player.greens = ""
+        player.grays = ""
+        player.yellows = ""
+        player.reminder = True
+    else:
+        player.reminder = not player.reminder
+    
+    db.commit()
+
+    respond(f"daily wordle reminders were turned {"off" if player.reminder == False else "on"}!")
+    db.close()
+    return
 
 def send_reminders():
     db = Session()

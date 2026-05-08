@@ -343,7 +343,7 @@ def handle_reminder(ack, respond, command):
     
     db.commit()
 
-    respond(f"daily wordle reminders were turned {"off" if player.reminder == False else "on"}!")
+    respond(f"daily wordle reminders were turned {'off' if player.reminder == False else 'on'}!")
     db.close()
     return
 

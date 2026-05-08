@@ -72,7 +72,6 @@ def handle_guess(ack, respond, command):
         return
 
     # get guess string!
-
     guess_string = check_guess(user_guess)
 
     if guess_string == "Not in word list":
@@ -90,30 +89,109 @@ def handle_guess(ack, respond, command):
         player.play_date = date.today()
         player.guesses = ""
         player.guess_strings = ""
+        player.done = False
 
-    if not player.guesses:
-        player.guesses = user_guess
-        player.guess_strings = guess_string
-    else:
-        player.guesses += f",{user_guess}"
-        player.guess_strings += f",{guess_string}"
+    if not player.done:
+        if not player.guesses:
+            player.guesses = user_guess
+            player.guess_strings = guess_string
+        else:
+            player.guesses += f",{user_guess}"
+            player.guess_strings += f",{guess_string}"
 
-    db.commit()
+        db.commit()
 
-    # get guess history now that it's updated
-
+    # get guess history
     guess_list = player.guesses.split(",")
     string_list = player.guess_strings.split(",")
 
+    if not player.done:
+        replypend = f"*guess {len(guess_list)}/6:*\n\n"
+    else:
+        replypend = "*you already finished! here's how you did!*\n\n"
 
-    reply = f"*guess {len(guess_list)}/6:*\n\n"
+    reply = ""
+    reply_pub = ""
 
     for count, guess in enumerate(guess_list):
         reply += f"{guess.upper()}: {string_list[count]}\n"
+        reply_pub += string_list[count]
+
+    if len(guess_list) == 6 or guess_string == "🟩🟩🟩🟩🟩":
+        player.done = True
+        db.commit()
+
+        respond(
+        text="your wordle results",
+        blocks=[
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": replypend + reply
+                }
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "share to channel"
+                        },
+                        "style": "primary",
+                        "value": reply_pub,
+                        "action_id": "share_result_button"
+                    }
+                ]
+            }
+        ]
+    )
+    else:
+        respond(replypend + reply)
 
     db.close()
-    respond(reply)
     return
+
+@app.action("share_result_button")
+def handle_share_button(ack, body, client, respond):
+    ack()
+
+    user_id = body["user"]["id"]
+    channel_id = body["channel"]["id"]
+
+    shared_text = body["actions"][0]["value"]
+
+    guess_amt = "X" if "🟩🟩🟩🟩🟩" not in shared_text else len(shared_text.splitlines())
+    wordle_number = int(requests.get(f"https://www.nytimes.com/svc/wordle/v2/{date.today()}.json").json()["days_since_launch"])
+    try:
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"<@{user_id}> - Wordle {wordle_number:,} {guess_amt}/6\n\n{shared_text}"
+        )
+    except Exception as e:
+        if "channel_not_found" in str(e):
+            respond("hey i'm not in this channel bud. invite me to the channel by using `/invite @Wordle for Slack` and then try again.")
+            return
+        else:
+            raise
+    
+    respond(
+        text="your result was shared to the channel!!!",
+        blocks=[
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": shared_text + "\n\n_shared to channel_"
+                }
+            }
+        ],
+        replace_original=True
+    )
+    return
+
 
 @app.command("/wordle-share")
 def handle_share(ack, respond, command):

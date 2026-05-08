@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date
+from sqlalchemy import create_engine, Column, Integer, String, Date, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 from datetime import date
@@ -16,6 +16,7 @@ class PlayerSession(Base):
     play_date = Column(Date, default=date.today)
     guesses = Column(String, default="")
     guess_strings = Column(String, default="")
+    done = Column(Boolean, default=False)
 
 Base.metadata.create_all(engine)
 

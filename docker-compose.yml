@@ -7,16 +7,23 @@ services:
       POSTGRES_PASSWORD: mysecretpassword
       POSTGRES_DB: wordledb
     volumes:
-      # This ensures your game data isn't deleted if the container restarts
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wordledb"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
 
   bot:
     build: .
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - TZ=America/Los_Angeles
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

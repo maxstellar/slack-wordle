@@ -5,8 +5,8 @@ wordle bot for slack in python.
 ## tech stack
 
 - python (slack bolt framework)
-- postgres
-- docker
+- postgresql
+- docker (i guess)
 
 ## setup
 

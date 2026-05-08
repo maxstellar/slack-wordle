@@ -2,6 +2,8 @@ import os
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from dotenv import load_dotenv
+from datetime import date
+import requests
 
 load_dotenv()
 
@@ -12,9 +14,18 @@ app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 with open('valid-wordle-words.txt', 'r') as file:
     valid_guesses = {line.strip() for line in file}
 
-# we'll have to load in the daily word from API later - update via date etc.
+# init daily word
+today = date.today()
 
-daily_word = "AUDIO".lower()
+def fetch_word():
+    global today
+    response = requests.get(f"https://www.nytimes.com/svc/wordle/v2/{today}.json")
+    return response.json()["solution"]
+
+
+daily_word = fetch_word()
+print(daily_word)
+
 
 def check_guess(guess):
     global daily_word
@@ -48,7 +59,7 @@ def check_guess(guess):
     
     return "".join(check_string)
 
-@app.command("/guess")
+@app.command("/wordle")
 def handle_guess(ack, respond, command):
     ack()
     raw_guess = command.get("text", "")
@@ -60,11 +71,17 @@ def handle_guess(ack, respond, command):
     # process raw guess
     user_guess = raw_guess.strip().lower()
 
-    if len(user_guess) != 5:
+    if len(user_guess) != 5 or not user_guess.isalpha():
         respond("hey bud... that's not 5 letters")
         return
 
     respond(f"{user_guess}: {check_guess(user_guess)}")
+    return
+
+@app.command("/wordle-share")
+def handle_share(ack, respond, command):
+    ack()
+    respond("i'm tired boss. no more sharing for you")
     return
 
 if __name__ == "__main__":

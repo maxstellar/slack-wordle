@@ -24,7 +24,7 @@ wordle bot for slack, written in python
 - `/wordle <guess>`: submit a 5-letter guess
 - `/wordle-letters`: see your current keyboard (green, yellow, gray, and remaining)
 - `/wordle-share`: manually share your results to the channel
-- 
+
 ## commands
 
 - `docker compose down`: stops the bot

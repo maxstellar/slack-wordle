@@ -41,6 +41,7 @@ def check_guess(guess):
             continue
         check_string.append("⬜")
     
+    
     # fill yellows
     for i, letter in enumerate(guess):
         if check_string[i] == "🟩":
@@ -98,6 +99,12 @@ def handle_guess(ack, respond, command):
         player.greens = ""
         player.yellows = ""
         player.grays = ""
+
+    # preliminary guard: stop if already done or at 6 guesses (catches race conditions)
+    if player.done or (player.guesses and len(player.guesses.split(",")) >= 6):
+        db.close()
+        respond("you've already finished today's wordle!")
+        return
 
     # process greens, yellows, grays
     for i in range(len(guess_string)):
@@ -351,8 +358,8 @@ def send_reminders():
     db = Session()
     slack_client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
     
-    players = db.query(PlayerSession).all()
-    
+    players = db.query(PlayerSession).filter_by(reminder=True).all()
+
     for player in players:
         # check if they haven't played today, or started but aren't finished
         if player.play_date != date.today() or not player.done:
